@@ -11,6 +11,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <unistd.h>
+
+void *connectHandler(void *sock_desc);
 
 int main(int argc, char *argv[])
 {
@@ -20,19 +23,16 @@ int main(int argc, char *argv[])
     int ns;                         /* Socket for first connection. */
     int ns2;                        /* Socket for second connection. */
     int len;                        /* len of sockaddr */
-    int maxfd;                      /* descriptors up to maxfd-1 polled*/
-    int nread;                      /* # chars on read()*/
-    int nready;                     /* # descriptors ready. */
+                    /* # descriptors ready. */
     int portno;
     struct sockaddr_in serv_addr, cli_addr1, cli_addr2;
     socklen_t clilen1, clilen2;
-    fd_set fds;                     /* Set of file descriptors to poll*/
-    time_t t;
-    srand((unsigned) time(&t));
+
     int i;
+	
+	pthread_t tid;
     
-    /* Create the socket. */
-    
+    /* Create the socket. */    
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("socket");
@@ -70,6 +70,17 @@ int main(int argc, char *argv[])
         perror("accept");
         exit(1);
     }
+	else
+	{
+		if(pthread_create(&tid, NULL, connectHandler, (void*) &ns) < 0)
+		{
+			perror("thread");
+			exit(1);
+		}
+	}
+	
+	pthread_join(tid, NULL);
+	
     clilen2 = sizeof(cli_addr2);
     /* Accept another connection. */
     if ((ns2 = accept(s, (struct sockaddr *) &cli_addr2, &clilen2)) < 0)
@@ -77,55 +88,52 @@ int main(int argc, char *argv[])
         perror("accept");
         exit(1);
     }
-    
-    maxfd = (ns > ns2 ? ns : ns2) + 1;
-    while (1)
-    {
-        /* Set up polling using select. */
-        FD_ZERO(&fds);
-        FD_SET(ns,&fds);
-        FD_SET(ns2,&fds);
-        
-        /* Wait for some input. */
-        nready = select(maxfd, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
-        /* If either descriptor has some input,
-         read it and copy it to the other. */
-        for (i = 0; i < 1023; i++)
-            buf[i] = '\0';
-
-        if( FD_ISSET(ns, &fds))
-        {
-            nread = recv(ns, buf, sizeof(buf), 0);
-            /* If error or eof, terminate. */
-            if(nread < 1)
-            {
-                close(ns);
-                close(ns2);
-            } 
-            
-            
-        }
-
-        for (i = 0; i < 1023; i++)
-            buf[i] = '\0';
-
-
-        if( FD_ISSET(ns2, &fds))
-        {
-            nread = recv(ns2, buf, sizeof(buf), 0);
-            /* If error or eof, terminate. */
-            if(nread < 1)
-            {
-                close(ns);
-                close(ns2);
-            }
-            
-            
-        }
-    }
-    close(ns);
-    close(ns2);
+	else
+	{
+		if(pthread_create(&tid, NULL, connectHandler, (void*) &ns) < 0)
+		{
+			perror("thread");
+			exit(1);
+		}
+	}
 }
 
-
-
+void *connectHandler(void *socket_desc)
+{
+    //Get the socket descriptor
+    int sock = *(int*)socket_desc;
+    int read_size;
+    char *message , client_message[2000];
+     
+    //Send some messages to the client
+    message = "Greetings! I am your connection handler\n";
+    write(sock , message , strlen(message));
+     
+    message = "Now type something and i shall repeat what you type \n";
+    write(sock , message , strlen(message));
+     
+    //Receive a message from client
+    while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 )
+    {
+        //end of string marker
+		client_message[read_size] = '\0';
+		
+		//Send the message back to client
+        write(sock , client_message , strlen(client_message));
+		
+		//clear the message buffer
+		memset(client_message, 0, 2000);
+    }
+     
+    if(read_size == 0)
+    {
+        puts("Client disconnected");
+        fflush(stdout);
+    }
+    else if(read_size == -1)
+    {
+        perror("recv failed");
+    }
+    close(sock);
+    return 0;
+} 
