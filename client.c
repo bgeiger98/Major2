@@ -1,3 +1,12 @@
+// ***********************************************************
+// * Matthew Floyd                                           *
+// * 3600.01                                                 *
+// * Due: 04/13/2018                                         *
+// *                                                         *
+// * This program sets up a client to be used in a Ponzi     *
+// * scheme                                                  *
+// ***********************************************************
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,15 +33,10 @@ int main(int argc, char *argv[])
     int isClient = 0;
     char buf[1024];                /* Buffer for messages to others. */
     char msg[1024];
-    int s;                          /* Listen socket */
-    int ns;                         /* Socket for first connection. */
     int len;                        /* len of sockaddr */
     int maxfd;                      /* descriptors up to maxfd-1 polled*/
     int nread;                      /* # chars on read()*/
     int nready;                     /* # descriptors ready. */
-    int portnoS;
-    struct sockaddr_in serv_addrS, cli_addr1;
-    socklen_t clilen1;
     fd_set fds;                     /* Set of file descriptors to poll*/
     time_t t;
     int i;
@@ -144,6 +148,13 @@ void startSubClient(void *argv) {
     close(sockfd2);
 }
 void startSubServer(void *argv) {
+    int portnoS;
+    struct sockaddr_in serv_addrS, cli_addr1;
+    int s;                          /* Listen socket */
+    int ns;                         /* Socket for first connection. */
+    socklen_t clilen1;
+    int i;
+    char buf[1024];                /* Buffer for messages to others. */
     /* Create the socket. */
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -182,7 +193,7 @@ void startSubServer(void *argv) {
         perror("accept");
         exit(1);
     }
-    maxfd = (ns > ns2 ? ns : ns2) + 1;    //???????????
+ //   maxfd = (ns > ns2 ? ns : ns2) + 1;    //???????????
     
     while (1)
     {
@@ -209,4 +220,3 @@ void startSubServer(void *argv) {
 
         
         
-
