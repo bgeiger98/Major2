@@ -1,12 +1,3 @@
-// ***********************************************************
-// * Matthew Floyd                                           *
-// * 3600.01                                                 *
-// * Due: 04/13/2018                                         *
-// *                                                         *
-// * This program sets up a client to be used in a Ponzi     *
-// * scheme                                                  *
-// ***********************************************************
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
