@@ -13,8 +13,8 @@ void error(const char *msg)
     exit(0);
 }
 
-void startSubClient(void);
-void startSubServer(void);
+void startSubClient(void*);
+void startSubServer(void*);
 
 int main(int argc, char *argv[])
 {
@@ -81,11 +81,11 @@ int main(int argc, char *argv[])
         if (FD_ISSET(0, &fds)) { // client 1
             gets(msg);
             send(sockfd, msg, sizeof(msg), 0); //send pq
-            nread = recv(ns, buf, sizeof(buf), 0); // receive ne
+            nread = recv(sockfd, buf, sizeof(buf), 0); // receive ne
             pthread_create(&serverThread, NULL, (void *) &startSubServer, (void *) argv);
         }
         if (FD_ISSET(sockfd, &fds)) { // client 2
-            nread = recv(ns, buf, sizeof(buf), 0);
+            nread = recv(sockfd, buf, sizeof(buf), 0);
             sleep(1);
             pthread_create(&clientThread, NULL, (void *) &startSubClient, (void *) argv);
         }
@@ -111,8 +111,8 @@ void startSubClient(void *argv) {
     {
         error("ERROR opening socket");
     }
-    
-    server2 = gethostbyname(argv[3]);
+    value = ((int*) argv)[3];
+    server2 = gethostbyname(value);
     
     if (server2 == NULL)
     {
@@ -146,6 +146,7 @@ void startSubServer(void *argv) {
     socklen_t clilen1;
     int i;
     char buf[1024];                /* Buffer for messages to others. */
+    int nread;
     /* Create the socket. */
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -153,9 +154,10 @@ void startSubServer(void *argv) {
         exit(1);
     }
     
+    int value = ((int*) argv)[4];
     /* Create the address of the server.*/
     bzero((char *) &serv_addrS, sizeof(serv_addrS));
-    portnoS = atoi(argv[4]);
+    portnoS = atoi(value);
     serv_addrS.sin_family = AF_INET;
     serv_addrS.sin_addr.s_addr = INADDR_ANY;
     serv_addrS.sin_port = htons(portnoS);
@@ -188,26 +190,21 @@ void startSubServer(void *argv) {
     
     while (1)
     {
-        /* Wait for some input. */
-        nready = select(maxfd, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
         
         /* If either descriptor has some input,
          read it and copy it to the other. */
         for (i = 0; i < 1023; i++)
             buf[i] = '\0';
         
-        if( FD_ISSET(ns, &fds))
+        if((nread = recv(ns, buf, sizeof(buf), 0)) < 1)
         {
-            nread = recv(ns, buf, sizeof(buf), 0);
-            if(nread < 1)
-            {
-                /* If error or eof, terminate. */
-                close(ns);
-            }
+            /* If error or eof, terminate. */
+            close(ns);
         }
-        
     }
 }
 
+
         
         
+
