@@ -1,3 +1,8 @@
+// ****************
+// * Major 2      *
+// * Group 19     *
+// ****************
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -6,29 +11,32 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <netinet/in.h>
-#include "krypt.h"
+#include <unistd.h>
+
+	int ns;
+	int ns2;
+void *connectHandler(void *s);
 
 int main(int argc, char *argv[])
 {
-    char buf[1024];                /* Buffer for messages to others. */
-    char msg[1024];
     int s;                          /* Listen socket */
-    int ns;                         /* Socket for first connection. */
-    int ns2;                        /* Socket for second connection. */
+//    int ns;                         /* Socket for first connection. */
+//    int ns2;    	/* Socket for second connection. */
+	int temp; /*Temp socket*/
+	
     int len;                        /* len of sockaddr */
-    int maxfd;                      /* descriptors up to maxfd-1 polled*/
-    int nread;                      /* # chars on read()*/
-    int nready;                     /* # descriptors ready. */
+                    /* # descriptors ready. */
     int portno;
     struct sockaddr_in serv_addr, cli_addr1, cli_addr2;
     socklen_t clilen1, clilen2;
-    fd_set fds;                     /* Set of file descriptors to poll*/
-    time_t t;
-    srand((unsigned) time(&t));
+
     int i;
+	int numConnect = 0;
+	char *message;
+	
+	pthread_t tid;
     
-    /* Create the socket. */
-    
+    /* Create the socket. */    
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("socket");
@@ -46,11 +54,11 @@ int main(int argc, char *argv[])
     
     /*Bind the socket to the address.*/
     int on = 1;
-    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));    
     if (bind(s, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
     {
         error("ERROR on binding");
-        exit(1);
+	exit(1);
     }
     
     /* Listen for connections. */
@@ -60,48 +68,112 @@ int main(int argc, char *argv[])
         exit(1);
     }
     clilen1 = sizeof(cli_addr1);
-    /*Accept a connection.*/
-    if ((ns = accept(s, (struct sockaddr *) &cli_addr1, &clilen1)) < 0)
-    {
-        perror("accept");
-        exit(1);
-    }
-    else {
-	printf("Connection 1 accepted.\n");
-    }
-    clilen2 = sizeof(cli_addr2);
-    /* Accept another connection. */
-    if ((ns2 = accept(s, (struct sockaddr *) &cli_addr2, &clilen2)) < 0)
-    {
-        perror("accept");
-        exit(1);
-    }
-    else {
-	printf("Connection 2 accepted.\n");
-    }
-    
-    maxfd = (ns > ns2 ? ns : ns2) + 1;
-    int flag = 1;
-    while(flag == 1)
+	clilen2 = sizeof(cli_addr2);
+	
+	while(1)
+	{
+		while(ns == 0 || ns2 == 0)
+			//while(numConnect < 2)
+		{
+/*		    if ((temp = accept(s, (struct sockaddr *) &cli_addr1, &clilen1)) < 0)
+			{
+				perror("accept");
+				exit(1);
+			}
+*/
+			if(ns == 0)
+			{
+				if(temp = accept(s, (struct sockaddr*) &cli_addr1, &clilen1) > 0)
+				{
+					printf("HELLO1\n");
+					ns = temp;
+					message = "First Client is connected\n";
+					write(ns, message, strlen(message));
+	//				send(ns, buff, sizeof(buff));
+					if(pthread_create(&tid, NULL, connectHandler, (void*) &ns) < 0)
+					{
+						perror("thread1");
+						exit(1);
+					}
+				}
+				else
+				{
+					perror("accept1");
+					exit(1);
+				}
+				numConnect ++;
+				close(temp);
+			
+			}
+			else if(ns2 == 0)
+			{
+				if(temp = accept(s, (struct sockaddr*) &cli_addr2, &clilen2) > 0)
+				{
+					printf("HELLO1\n");
+					ns = temp;
+					message = "Second Client is connected\n";
+					write(ns2, message, strlen(message));
+	//				send(ns, buff, sizeof(buff));
+					if(pthread_create(&tid, NULL, connectHandler, (void*) &ns2) < 0)
+					{
+						perror("thread1");
+						exit(1);
+					}
+				}
+				else
+				{
+					perror("accept1");
+					exit(1);
+				}
+			}
+			else
+			{
+				message = "There are no connections made\n";
+				write(ns, message, strlen(message));
+				write(ns2, message, strlen(message));
+				close(temp);
+			}
+			close(temp);
+		}
+	}
+}
+
+void *connectHandler(void *s)
+{
+	printf("AYY connected\n");
+	int sockfd = *(int*)s;
+	int maxfd = sockfd + 1;                     /* descriptors up to maxfd-1 polled*/
+    int nread;                      /* # chars on read()*/
+    int nready; 
+	char buf[1024];                /* Buffer for messages to others. */
+    char msg[1024];
+    fd_set fds;                     /* Set of file descriptors to poll*/
+	int i; 	
+	
+	while(nread <= 0)
+	{
+		nread = recv(sockfd, buf, sizeof(buf), 0);
+	}
+	printf("%s\n", buf);
+	
+	int flag = 1;
+    while (flag == 1)
     {
         /* Set up polling using select. */
         FD_ZERO(&fds);
         FD_SET(ns,&fds);
         FD_SET(ns2,&fds);
-	
-	printf("above select\n");        
+        
         /* Wait for some input. */
         nready = select(maxfd, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
-	printf("below connect\n");
         /* If either descriptor has some input,
          read it and copy it to the other. */
-        for (i = 0; i < 1023; i++){
+        for (i = 0; i < 1023; i++)
             buf[i] = '\0';
-        }
+
         if( FD_ISSET(ns, &fds))
         {
-	    printf("ns1 flag\n");
-	    flag = 0;
+			flag = 0;
             nread = recv(ns, buf, sizeof(buf), 0);
             /* If error or eof, terminate. */
             if(nread < 1)
@@ -113,16 +185,14 @@ int main(int argc, char *argv[])
             
             send(ns2, buf, sizeof(buf), 0);
         }
-        
-        for (i = 0; i < 1023; i++) {
+
+        for (i = 0; i < 1023; i++)
             buf[i] = '\0';
-	}
-        
-        
+
+
         if( FD_ISSET(ns2, &fds))
         {
-	    printf("ns2 flag\n");
-	    flag = 0;
+            flag = 0;
             nread = recv(ns2, buf, sizeof(buf), 0);
             /* If error or eof, terminate. */
             if(nread < 1)
@@ -134,13 +204,11 @@ int main(int argc, char *argv[])
             
             send(ns, buf, sizeof(buf), 0);
         }
-	for (i = 0; i < 1023; i++){
+		for (i = 0; i < 1023; i++)
+		{
             buf[i] = '\0';
-	}
-
+		}
     }
     close(ns);
     close(ns2);
 }
-
-
