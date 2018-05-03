@@ -6,6 +6,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include "krypt.h"
 
 void error(const char *msg)
 {
@@ -35,7 +38,7 @@ int main(int argc, char *argv[])
     pthread_t serverThread;
     pthread_t clientThread;
     
-    if (argc < 3)
+    if (argc < 4)
     {
         fprintf(stderr,"usage %s hostname port\n", argv[0]);
         exit(0);
@@ -64,34 +67,75 @@ int main(int argc, char *argv[])
     
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0)
     {
-        error("ERROR connecting");
+        error("1ERROR connecting");
     }
     
-    if ((n = read(sockfd,buffer,255) < 0))
+    /*if ((n = read(sockfd,buffer,255) < 0))
     {
         error("ERROR reading from socket");
         exit(0);
-    }
-
-    while(1) {
+    }*/
+    int flag = 1;
+    while(flag == 1) {
         FD_ZERO(&fds);
         FD_SET(sockfd,&fds);
         FD_SET(0,&fds);
-        nready = select(3, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
+        nready = select(sockfd+1, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
+	if (nready == -1) {
+		perror("select");
+		exit(1);
+	}
         if (FD_ISSET(0, &fds)) { // client 1
-            gets(msg);
+	    flag=0;
+	    printf("In client 1 before gets\n");
+            fgets(msg, strlen(msg), stdin);
             send(sockfd, msg, sizeof(msg), 0); //send pq
             nread = recv(sockfd, buf, sizeof(buf), 0); // receive ne
             pthread_create(&serverThread, NULL, (void *) &startSubServer, (void *) argv);
         }
-        if (FD_ISSET(sockfd, &fds)) { // client 2
+        else if (FD_ISSET(sockfd, &fds)) { // client 2
+	    flag=0;
+	    printf("In client 2 before receive\n");
             nread = recv(sockfd, buf, sizeof(buf), 0);
             sleep(1);
             pthread_create(&clientThread, NULL, (void *) &startSubClient, (void *) argv);
         }
-        
+	for (i = 0; i < 1024; i++) {
+		buf[i] = '\0';
+	}
     }
-    
+    pthread_join(serverThread, NULL);
+    pthread_join(clientThread, NULL);
+    flag = 1;
+     fflush(stdin);
+     while(flag == 1) {
+        FD_ZERO(&fds);
+        FD_SET(sockfd,&fds);
+        FD_SET(0,&fds);
+        nready = select(sockfd+1, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
+	if (nready == -1) {
+		perror("select");
+		exit(1);
+	}
+        if (FD_ISSET(0, &fds)) { // client 1
+	    flag=0;
+	    printf("In client 1 before gets\n");
+            fgets(msg, strlen(msg), stdin);
+            send(sockfd, msg, sizeof(msg), 0); //send pq
+            nread = recv(sockfd, buf, sizeof(buf), 0); // receive ne
+            pthread_create(&serverThread, NULL, (void *) &startSubServer, (void *) argv);
+        }
+        else if (FD_ISSET(sockfd, &fds)) { // client 2
+	    flag=0;
+	    printf("In client 2 before receive\n");
+            nread = recv(sockfd, buf, sizeof(buf), 0);
+            sleep(1);
+            pthread_create(&clientThread, NULL, (void *) &startSubClient, (void *) argv);
+        }
+    }
+    pthread_join(serverThread, NULL);
+    pthread_join(clientThread, NULL);
+
     close(sockfd);
     return 0;
         
@@ -101,7 +145,7 @@ void startSubClient(void *argv) {
     int sockfd2, portno2, n2;
     struct sockaddr_in serv_addr2;
     struct hostent *server2;
-    char buffer2[256];
+    char buffer2[256] = "HEllo\n";
     
     int value = ((int*) argv)[4];
     portno2 = atoi(value);
@@ -127,15 +171,20 @@ void startSubClient(void *argv) {
     
     if (connect(sockfd2,(struct sockaddr *) &serv_addr2,sizeof(serv_addr2)) < 0)
     {
-        error("ERROR connecting");
+        error("2ERROR connecting");
     }
+    else 
+	printf("Sub Client connected\n");
     
-    while(1) {
-        if ((n2 = write(sockfd2,buffer2,strlen(buffer2))) < 0)
-        {
-            error("ERROR writing to socket");
-        }
+    int i;
+    for (i = 0; i < 256; i++){
+	buffer2[i] = '\0'; 
     }
+    if ((n2 = recv(sockfd2,buffer2,sizeof(buffer2), 0)) < 1)
+    {
+        error("ERROR buffer 2 writing to socket");
+    }
+    printf("buffer2 = %s\n", buffer2);
     close(sockfd2);
 }
 void startSubServer(void *argv) {
@@ -186,25 +235,23 @@ void startSubServer(void *argv) {
         perror("accept");
         exit(1);
     }
+    else 
+	printf("Accepted connection\n");
  //   maxfd = (ns > ns2 ? ns : ns2) + 1;    //???????????
     
-    while (1)
-    {
         
-        /* If either descriptor has some input,
-         read it and copy it to the other. */
-        for (i = 0; i < 1023; i++)
-            buf[i] = '\0';
-        
-        if((nread = recv(ns, buf, sizeof(buf), 0)) < 1)
-        {
-            /* If error or eof, terminate. */
-            close(ns);
-        }
+    /* If either descriptor has some input,
+        read it and copy it to the other. */
+    for (i = 0; i < 1023; i++){
+        buf[i] = '\0';
     }
+    wait(1);
+    gets(buf);
+    if((nread = write(ns, buf, strlen(buf))) < 0)
+    {
+    /* If error or eof, terminate. */
+ 	close(ns);
+    }
+    close(ns);
+    close(s);
 }
-
-
-        
-        
-
