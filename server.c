@@ -11,28 +11,34 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <unistd.h>
+
+    int s;                          /* Listen socket */
+	int ns = 0;
+	int ns2 = 0;
+	int numConnect;
+void connectHandler();
+void listenInf();
+
 
 int main(int argc, char *argv[])
 {
     char buf[1024];                /* Buffer for messages to others. */
     char msg[1024];
-    int s;                          /* Listen socket */
-    int ns;                         /* Socket for first connection. */
-    int ns2;                        /* Socket for second connection. */
+
+//    int ns;                         /* Socket for first connection. */
+//    int ns2;                        /* Socket for second connection. */
     int len;                        /* len of sockaddr */
-    int maxfd;                      /* descriptors up to maxfd-1 polled*/
-    int nread;                      /* # chars on read()*/
-    int nready;                     /* # descriptors ready. */
+                    /* # descriptors ready. */
     int portno;
     struct sockaddr_in serv_addr, cli_addr1, cli_addr2;
     socklen_t clilen1, clilen2;
-    fd_set fds;                     /* Set of file descriptors to poll*/
-    time_t t;
-    srand((unsigned) time(&t));
+
     int i;
+	pthread_t lid;
+	pthread_t cid;
     
-    /* Create the socket. */
-    
+    /* Create the socket. */    
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("socket");
@@ -63,69 +69,119 @@ int main(int argc, char *argv[])
         perror( "listen");
         exit(1);
     }
-    clilen1 = sizeof(cli_addr1);
-    /*Accept a connection.*/
-    if ((ns = accept(s, (struct sockaddr *) &cli_addr1, &clilen1)) < 0)
-    {
-        perror("accept");
-        exit(1);
-    }
-    clilen2 = sizeof(cli_addr2);
-    /* Accept another connection. */
-    if ((ns2 = accept(s, (struct sockaddr *) &cli_addr2, &clilen2)) < 0)
-    {
-        perror("accept");
-        exit(1);
-    }
-    
-    maxfd = (ns > ns2 ? ns : ns2) + 1;
-    while (1)
-    {
-        /* Set up polling using select. */
-        FD_ZERO(&fds);
-        FD_SET(ns,&fds);
-        FD_SET(ns2,&fds);
-        
-        /* Wait for some input. */
-        nready = select(maxfd, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
-        /* If either descriptor has some input,
-         read it and copy it to the other. */
-        for (i = 0; i < 1023; i++)
-            buf[i] = '\0';
+    	printf("1)%d\n", numConnect);
+		
+	
+	if(pthread_create(&lid, NULL, (void*) &listenInf, (void*) 0) < 0)
+	{
+		perror("infinite connections");
+		exit(1);
+	}
+	printf("2)%d\n", numConnect);
+	while(numConnect < 2)
+	{
+		//Wait for 2 connections
+//			printf("%d\n", numConnect);
+	}
+		printf("3)%d\n", numConnect);
+		
+	if(pthread_create(&cid, NULL, (void*) &connectHandler, (void*) 0) < 0)
+	{
+		perror("thread");
+		exit(1);
+	}
+	printf("Time to Connect Handler\n");
 
-        if( FD_ISSET(ns, &fds))
-        {
-            nread = recv(ns, buf, sizeof(buf), 0);
-            /* If error or eof, terminate. */
-            if(nread < 1)
-            {
-                close(ns);
-                close(ns2);
-            } 
-            
-            
-        }
-
-        for (i = 0; i < 1023; i++)
-            buf[i] = '\0';
-
-
-        if( FD_ISSET(ns2, &fds))
-        {
-            nread = recv(ns2, buf, sizeof(buf), 0);
-            /* If error or eof, terminate. */
-            if(nread < 1)
-            {
-                close(ns);
-                close(ns2);
-            }
-            
-            
-        }
-    }
-    close(ns);
-    close(ns2);
+	printf("skipped connectHandler\n");
+	
+	pthread_join(lid, NULL);
+	pthread_join(cid, NULL);
+	close(s);
 }
 
-
-
+void listenInf()
+{
+	int temp;
+	struct sockaddr_in cli_addr;
+	int clilen = sizeof(cli_addr);
+	char *message;
+//	int numConnect = 0;
+	
+	while(1)
+	{
+		if((temp = accept(s, (struct sockaddr*) &cli_addr, &clilen)) < 0)
+		{
+			perror("accept");
+			exit(1);
+		}
+		if(ns == 0)
+		{
+			printf("HELLO1\n");
+			ns = temp;
+			message = "First Client is connected\n";
+			write(ns, message, strlen(message));
+			numConnect ++;
+		}
+		else if(ns2 == 0)
+		{
+			printf("HELLO2\n");
+			ns2 = temp;
+			message = "Second Client is connected\n";
+			write(ns2, message, strlen(message));
+			numConnect ++;
+		}
+		else
+		{
+			message = "There are no connections made\n";
+			write(ns, message, strlen(message));
+			write(ns2, message, strlen(message));
+			close(temp);
+		}
+		
+	}
+}
+void connectHandler()
+{
+	char *rcvdBuff;
+	char *sendBuff;
+	printf("Entered Connection Handler!");
+	fd_set fds;
+	
+	int currCli;
+	
+	while(1)
+	{
+		FD_ZERO(&fds);
+		FD_SET(ns, &fds);
+		FD_SET(ns2, &fds);
+		
+		int nfds;
+		
+		if(ns > ns2)
+		{
+			nfds = ns + 1;
+		}
+		else
+		{
+			nfds = ns2 + 1;
+		}
+		
+		select(nfds, &fds, NULL, NULL, NULL);
+	
+		if(FD_ISSET(ns, &fds))
+		{
+			currCli = ns;
+		}
+		if(FD_ISSET(ns2, &fds))
+		{
+			currCli = ns2;
+		}
+		
+		recv(currCli, &rcvdBuff, sizeof(rcvdBuff), 0);
+		
+		if(strcmp(rcvdBuff, "hELLO") == 0)
+		{
+			printf("HELLO RECEIVED\n");
+		}
+	}*/
+} 
