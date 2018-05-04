@@ -68,28 +68,28 @@ int main(int argc, char *argv[])
     {
         error("1ERROR connecting");
     }
-    
+	int flag3 = 0, flag4 = 0;    
 	for(j = 0; j < 2; j++) {
 	    int flag = 1;
 	    svrT = 0;
 	    cliT = 0;
 	    while(flag == 1) {
+		printf("Begin while\n");
+		printf("Flag3 = %i\n Flag4 = %i\n", flag3, flag4);
+		fflush(stdin);
+		fflush(stdout);
 		FD_ZERO(&fds);
 		FD_SET(sockfd,&fds);
 		FD_SET(STDIN_FILENO,&fds);
 		nready = select(sockfd+1, &fds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
-	//	fds[0].fd = STDIN_FILENO;//
-	//	fds[0].events = POLLIN;//
-	//	fds[1].fd = sockfd;//
-	//	fds[1].events = POLLIN;//
-	//	nready = poll(&fds, sockfd+1, NULL);//
 		if (nready == -1) {
 		    perror("select");
 		    exit(1);
 		}
-		if (FD_ISSET(STDIN_FILENO, &fds)) { // client 1
-		//if (fds[0].revents & POLLIN) { // client 1
+		flag3 = 0;
+		if (FD_ISSET(STDIN_FILENO, &fds) && flag3 == 0) { // client 1
 		    flag=0;
+		    flag3 = 1;
 		    printf("In client 1 before gets\n");
 		    fgets(msg, sizeof(msg), stdin);
 		    send(sockfd, msg, sizeof(msg), 0); //send pq
@@ -98,20 +98,27 @@ int main(int argc, char *argv[])
 	//printf("nread = %i\n", nread);
 		    pthread_create(&serverThread, NULL, (void *) &startSubServer, (void *) argv);
 		}
-		if (FD_ISSET(sockfd, &fds)) { // client 2
-		//if (fds[1].revents & POLLIN) { // client 2
+		if (FD_ISSET(sockfd, &fds) && flag4 == 0) { // client 2
 		    flag=0;
+		    flag4 = 1;
+		    flag3 = 0;
 		    printf("In client 2 before receive\n");
 	//printf("nread = %i\n", nread);
 		    cliT = 1;
-		    nread = recv(sockfd, buf, sizeof(buf), 0);
+		    if (flag3 = 0)
+		    	nread = recv(sockfd, buf, sizeof(buf), 0);
 		    sleep(1);
+		    if (flag3 = 1) {
+			while((nread = recv(sockfd, buf, sizeof(buf), 0)) < 1) {};
+		    }
+
 		    pthread_create(&clientThread, NULL, (void *) &startSubClient, (void *) argv);
 		}
 		for (i = 0; i < 1024; i++) {
 		    buf[i] = '\0';
 		}
 	    }
+	    printf("Out of while\n");
 	    if (svrT == 1)
 		pthread_join(serverThread, NULL);
 	    if (cliT == 1)
