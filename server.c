@@ -7,14 +7,16 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include "krypt.h"
+#include <pthread.h>
 
+void connectHandler(void);
+int s;
+int ns;
+int ns2;
 int main(int argc, char *argv[])
 {
     char buf[1024];                /* Buffer for messages to others. */
     char msg[1024];
-    int s;                          /* Listen socket */
-    int ns;                         /* Socket for first connection. */
-    int ns2;                        /* Socket for second connection. */
     int len;                        /* len of sockaddr */
     int maxfd;                      /* descriptors up to maxfd-1 polled*/
     int nread;                      /* # chars on read()*/
@@ -26,7 +28,8 @@ int main(int argc, char *argv[])
     time_t t;
     srand((unsigned) time(&t));
     int i;
-    
+    pthread_t connectThread;    
+
     /* Create the socket. */
     
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -52,38 +55,51 @@ int main(int argc, char *argv[])
         error("ERROR on binding");
         exit(1);
     }
-    
-    /* Listen for connections. */
-    if (listen(s, 5) < 0)
-    {
-        perror( "listen");
-        exit(1);
+    while(1) {
+	    /* Listen for connections. */
+	    if (listen(s, 2) < 0)
+	    {
+		perror( "listen");
+		exit(1);
+	    }
+	    clilen1 = sizeof(cli_addr1);
+	    /*Accept a connection.*/
+	    if ((ns = accept(s, (struct sockaddr *) &cli_addr1, &clilen1)) < 0)
+	    {
+		perror("accept");
+		exit(1);
+	    }
+	    else {
+		printf("Connection 1 accepted.\n");
+	    }
+	    clilen2 = sizeof(cli_addr2);
+	    /* Accept another connection. */
+	    if ((ns2 = accept(s, (struct sockaddr *) &cli_addr2, &clilen2)) < 0)
+	    {
+		perror("accept");
+		exit(1);
+	    }
+	    else {
+		printf("Connection 2 accepted.\n");
+		pthread_create(&connectThread, NULL, (void *) &connectHandler, NULL);
+	    }
     }
-    clilen1 = sizeof(cli_addr1);
-    /*Accept a connection.*/
-    if ((ns = accept(s, (struct sockaddr *) &cli_addr1, &clilen1)) < 0)
-    {
-        perror("accept");
-        exit(1);
-    }
-    else {
-	printf("Connection 1 accepted.\n");
-    }
-    clilen2 = sizeof(cli_addr2);
-    /* Accept another connection. */
-    if ((ns2 = accept(s, (struct sockaddr *) &cli_addr2, &clilen2)) < 0)
-    {
-        perror("accept");
-        exit(1);
-    }
-    else {
-	printf("Connection 2 accepted.\n");
-    }
-    
+}
+
+void connectHandler(void) {
+    char buf[1024];                /* Buffer for messages to others. */
+    char msg[1024];
+    int maxfd;                      /* descriptors up to maxfd-1 polled*/
+    int nread;                      /* # chars on read()*/
+    int nready;                     /* # descriptors ready. */
+    fd_set fds;                     /* Set of file descriptors to poll*/
+    int i;
+    int x = 1;
     maxfd = (ns > ns2 ? ns : ns2) + 1;
     int flag = 1;
-    while(flag == 1)
+    while(x != 4)
     {
+        printf("Loop #%x\n", x++);
         /* Set up polling using select. */
         FD_ZERO(&fds);
         FD_SET(ns,&fds);
@@ -141,6 +157,6 @@ int main(int argc, char *argv[])
     }
     close(ns);
     close(ns2);
+
+
 }
-
-
